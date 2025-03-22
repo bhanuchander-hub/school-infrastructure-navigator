@@ -26,15 +26,6 @@ import {
 import { toast } from "./hooks/use-toast";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      retry: 1,
-    },
-  },
-});
-
 // Protected route component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { currentUser, loading } = useAuth();
@@ -106,6 +97,16 @@ const AppContent = () => {
 };
 
 const App = () => {
+  // Create a new QueryClient instance inside the component
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: 1000 * 60 * 5, // 5 minutes
+        retry: 1,
+      },
+    },
+  });
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
