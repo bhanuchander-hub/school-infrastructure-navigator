@@ -9,7 +9,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyAwoSR8MeeboozwcNbr3zsVmzR-IETM66s",
   authDomain: "friend-9fe49.firebaseapp.com",
   projectId: "friend-9fe49",
-  storageBucket: "friend-9fe49.firebasestorage.app",
+  storageBucket: "friend-9fe49.appspot.com", // Fixed the storage bucket URL
   messagingSenderId: "301940443148",
   appId: "1:301940443148:web:e5cfa078be3cc8ba208629",
   measurementId: "G-FVDNBDW82M"
