@@ -13,7 +13,8 @@ import {
   DocumentData,
   DocumentReference,
   DocumentSnapshot,
-  setDoc
+  setDoc,
+  getFirestore
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { 
@@ -37,7 +38,41 @@ const COLLECTIONS = {
   INFRASTRUCTURE_PROJECTS: 'infrastructureProjects',
   REGISTRATIONS: 'registrations',
   FEEDBACKS: 'feedbacks',
-  ACTIVITIES: 'activities'
+  ACTIVITIES: 'activities',
+  USERS: 'users'
+};
+
+// Check if collections exist, if not create them
+export const ensureCollectionsExist = async () => {
+  try {
+    console.log("Checking if collections exist...");
+    const requiredCollections = Object.values(COLLECTIONS);
+    
+    for (const collectionName of requiredCollections) {
+      const collectionRef = collection(db, collectionName);
+      const snapshot = await getDocs(collectionRef);
+      
+      // If the collection doesn't have any documents, we'll create a sample document
+      // This will ensure the collection exists in Firestore
+      if (snapshot.empty) {
+        console.log(`Creating collection: ${collectionName}`);
+        
+        // Create a placeholder document that can be safely deleted later
+        await setDoc(doc(db, collectionName, 'placeholder'), {
+          created: new Date().toISOString(),
+          isPlaceholder: true,
+          note: 'This document was automatically created to ensure the collection exists'
+        });
+      } else {
+        console.log(`Collection already exists: ${collectionName}`);
+      }
+    }
+    
+    console.log("All collections verified");
+  } catch (error) {
+    console.error("Error ensuring collections exist:", error);
+    throw error;
+  }
 };
 
 // Initializes the database with mock data if it doesn't exist
@@ -51,11 +86,19 @@ export const initializeFirestore = async (mockData: {
   recentActivities: Activity[]
 }) => {
   try {
+    // First ensure all collections exist
+    await ensureCollectionsExist();
+    
     // Check if data already exists
     const schoolsSnapshot = await getDocs(collection(db, COLLECTIONS.SCHOOLS));
     
-    if (schoolsSnapshot.empty) {
+    if (schoolsSnapshot.empty || schoolsSnapshot.docs.length === 1 && schoolsSnapshot.docs[0].id === 'placeholder') {
       console.log("Initializing Firestore with mock data...");
+      
+      // If we only have the placeholder document, remove it before adding real data
+      if (schoolsSnapshot.docs.length === 1 && schoolsSnapshot.docs[0].id === 'placeholder') {
+        await deleteDoc(doc(db, COLLECTIONS.SCHOOLS, 'placeholder'));
+      }
       
       // Add locations
       const locationPromises = mockData.locations.map(location => 
@@ -98,6 +141,18 @@ export const initializeFirestore = async (mockData: {
         setDoc(doc(db, COLLECTIONS.ACTIVITIES, activity.id), activity)
       );
       await Promise.all(activityPromises);
+      
+      // Clean up placeholder documents in other collections
+      const collections = Object.values(COLLECTIONS);
+      for (const collectionName of collections) {
+        if (collectionName !== COLLECTIONS.SCHOOLS) { // We already handled schools
+          const placeholderRef = doc(db, collectionName, 'placeholder');
+          const placeholderDoc = await getDoc(placeholderRef);
+          if (placeholderDoc.exists() && placeholderDoc.data().isPlaceholder) {
+            await deleteDoc(placeholderRef);
+          }
+        }
+      }
       
       console.log("Firestore initialization complete");
     } else {
