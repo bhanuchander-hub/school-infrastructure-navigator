@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Search, Filter, ChevronDown, ArrowUpDown, School as SchoolIcon, MapPin, Droplet } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +12,8 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { tapConnections, schools, locations } from "@/lib/data";
+import { toast } from "@/hooks/use-toast";
+import { getTapConnections, getSchools, getLocations } from "@/lib/firestore";
 import { TapConnection, TapConnectionStatus, WaterSourceType, School } from "@/lib/types";
 
 // Define a simpler type for the school in EnhancedTapConnection
@@ -31,7 +33,6 @@ type EnhancedTapConnection = Omit<TapConnection, 'school'> & {
 };
 
 const TapConnections = () => {
-  const [connections, setConnections] = useState<EnhancedTapConnection[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredConnections, setFilteredConnections] = useState<EnhancedTapConnection[]>([]);
   const [statusFilter, setStatusFilter] = useState<TapConnectionStatus[]>([]);
@@ -40,26 +41,59 @@ const TapConnections = () => {
     key: keyof EnhancedTapConnection | "school.name" | "school.location.townName";
     direction: "asc" | "desc";
   } | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch data using React Query
+  const { data: tapConnectionsData, isLoading: isLoadingConnections, error: connectionsError } = useQuery({
+    queryKey: ['tapConnections'],
+    queryFn: getTapConnections
+  });
+
+  const { data: schoolsData, isLoading: isLoadingSchools, error: schoolsError } = useQuery({
+    queryKey: ['schools'],
+    queryFn: getSchools
+  });
+
+  const { data: locationsData, isLoading: isLoadingLocations, error: locationsError } = useQuery({
+    queryKey: ['locations'],
+    queryFn: getLocations
+  });
+
+  const isLoading = isLoadingConnections || isLoadingSchools || isLoadingLocations;
+  const hasError = connectionsError || schoolsError || locationsError;
+
+  // Combine the data to create enhanced connections
+  const [connections, setConnections] = useState<EnhancedTapConnection[]>([]);
 
   useEffect(() => {
-    const fetchConnections = async () => {
-      setIsLoading(true);
-      // Simulate API call with a delay
-      setTimeout(() => {
-        // Combine tap connections with school and location data
-        const enhancedConnections: EnhancedTapConnection[] = tapConnections.map(connection => {
-          const school = schools.find(s => s.id === connection.schoolId);
-          const location = locations.find(l => l.id === school?.locationId);
+    if (tapConnectionsData && schoolsData && locationsData) {
+      try {
+        const enhancedConnections: EnhancedTapConnection[] = tapConnectionsData.map(connection => {
+          const school = schoolsData.find(s => s.id === connection.schoolId);
+          const location = locationsData.find(l => l.id === school?.locationId);
+          
+          if (!school || !location) {
+            console.warn(`Missing data for connection: ${connection.id}`);
+            return {
+              ...connection,
+              school: {
+                id: 'unknown',
+                name: 'Unknown School',
+                location: {
+                  townName: 'Unknown',
+                  districtName: 'Unknown'
+                }
+              }
+            };
+          }
           
           return {
             ...connection,
             school: {
-              id: school?.id || "",
-              name: school?.name || "",
+              id: school.id,
+              name: school.name,
               location: {
-                townName: location?.townName || "",
-                districtName: location?.districtName || ""
+                townName: location.townName,
+                districtName: location.districtName
               }
             }
           };
@@ -67,12 +101,26 @@ const TapConnections = () => {
         
         setConnections(enhancedConnections);
         setFilteredConnections(enhancedConnections);
-        setIsLoading(false);
-      }, 500);
-    };
+      } catch (error) {
+        console.error("Error processing data:", error);
+        toast({
+          title: "Data Error",
+          description: "Failed to process connection data.",
+          variant: "destructive",
+        });
+      }
+    }
+  }, [tapConnectionsData, schoolsData, locationsData]);
 
-    fetchConnections();
-  }, []);
+  useEffect(() => {
+    if (hasError) {
+      toast({
+        title: "Data Fetch Error",
+        description: "Failed to load connections data from the database.",
+        variant: "destructive",
+      });
+    }
+  }, [hasError]);
 
   useEffect(() => {
     const applyFilters = () => {
@@ -283,6 +331,13 @@ const TapConnections = () => {
           {[...Array(5)].map((_, i) => (
             <div key={i} className="h-16 bg-gray-50 border-t border-gray-100"></div>
           ))}
+        </div>
+      ) : hasError ? (
+        <div className="text-center py-12 bg-white rounded-lg shadow-soft border border-gray-100">
+          <p className="text-red-500 mb-4">Error loading data. Please try again later.</p>
+          <Button variant="outline" onClick={() => window.location.reload()}>
+            Retry
+          </Button>
         </div>
       ) : filteredConnections.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-lg shadow-soft border border-gray-100">
