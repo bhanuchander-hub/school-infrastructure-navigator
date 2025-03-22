@@ -12,18 +12,22 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { tapConnections, schools, locations } from "@/lib/data";
-import { TapConnection, TapConnectionStatus, WaterSourceType } from "@/lib/types";
+import { TapConnection, TapConnectionStatus, WaterSourceType, School } from "@/lib/types";
 
-// Enhanced tap connection with school and location information
-type EnhancedTapConnection = TapConnection & {
-  school: {
-    id: string;
-    name: string;
-    location: {
-      townName: string;
-      districtName: string;
-    };
+// Define a simpler type for the school in EnhancedTapConnection
+// that only includes the properties we need
+interface SimplifiedSchool {
+  id: string;
+  name: string;
+  location: {
+    townName: string;
+    districtName: string;
   };
+}
+
+// Enhanced tap connection with simplified school information
+type EnhancedTapConnection = Omit<TapConnection, 'school'> & {
+  school: SimplifiedSchool;
 };
 
 const TapConnections = () => {
@@ -44,7 +48,7 @@ const TapConnections = () => {
       // Simulate API call with a delay
       setTimeout(() => {
         // Combine tap connections with school and location data
-        const enhancedConnections = tapConnections.map(connection => {
+        const enhancedConnections: EnhancedTapConnection[] = tapConnections.map(connection => {
           const school = schools.find(s => s.id === connection.schoolId);
           const location = locations.find(l => l.id === school?.locationId);
           
