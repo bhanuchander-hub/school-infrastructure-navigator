@@ -41,6 +41,7 @@ const Login = () => {
         title: "Login successful",
         description: "Welcome back!",
       });
+      // Redirect to the main page after successful login
       navigate("/");
     } catch (error: any) {
       let errorMessage = "Failed to login";
@@ -65,6 +66,7 @@ const Login = () => {
         title: "Login successful",
         description: "Welcome back!",
       });
+      // Redirect to the main page after successful Google login
       navigate("/");
     } catch (error) {
       toast({
